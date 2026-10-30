@@ -16,332 +16,207 @@ export interface NewsItem {
   riskLevel: string;
 }
 
-
 interface CBICItem {
+  id: number;
 
-  id:number;
+  updatedDate?: string;
 
-  updatedDate?:string;
+  notificationNo?: string;
 
-  notificationNo?:string;
+  notificationName?: string;
 
-  notificationName?:string;
+  updateType?: string;
 
-  updateType?:string;
+  updateCategory?: string;
 
-  updateCategory?:string;
+  service?: string;
 
-  service?:string;
-
-  docFilePath?:string;
-
+  docFilePath?: string;
 }
-
-
 
 interface ParseOptions {
-
-  maxAgeDays?:number;
-
+  maxAgeDays?: number;
 }
 
+const BASE_URL = "https://taxinformation.cbic.gov.in";
 
+function getDocumentFolder(type?: string) {
+  switch (
+    (type ?? "")
+      .toLowerCase()
+      .replace(/s$/, "")
+  ) {
+    case "notification":
+      return "Notifications";
 
-const BASE_URL =
-"https://taxinformation.cbic.gov.in";
+    case "circular":
+      return "Circulars";
 
+    case "order":
+      return "Orders";
 
+    case "instruction":
+      return "Instructions";
 
-function getDocumentFolder(type?:string){
-
-switch(
-(type ?? "")
-.toLowerCase()
-.replace(/s$/,"")
-){
-
-case "notification":
-return "Notifications";
-
-case "circular":
-return "Circulars";
-
-case "order":
-return "Orders";
-
-case "instruction":
-return "Instructions";
-
-default:
-return "Notifications";
-
+    default:
+      return "Notifications";
+  }
 }
-
-}
-
-
-
 
 function getDocumentLink(
-item:CBICItem
-){
-
-/*
+  item: CBICItem,
+) {
+  /*
  NEVER use Windows server path
-*/
+  */
 
-if(
-item.docFilePath &&
-item.docFilePath.startsWith("http")
-){
+  if (
+    item.docFilePath &&
+    item.docFilePath.startsWith("http")
+  ) {
+    return item.docFilePath;
+  }
 
-return item.docFilePath;
-
+  return `${BASE_URL}/view-pdf/${item.id}/ENG/${
+    getDocumentFolder(item.updateType)
+  }`;
 }
-
-
-return `${BASE_URL}/view-pdf/${item.id}/ENG/${getDocumentFolder(item.updateType)}`;
-
-}
-
-
-
 
 function analyseCBICImpact(
-item:CBICItem
-){
-
-const text =
-`
+  item: CBICItem,
+) {
+  const text = `
 ${item.service ?? ""}
 ${item.notificationName ?? ""}
 ${item.updateCategory ?? ""}
 `
-.toLowerCase();
+    .toLowerCase();
 
+  let service = "Indirect Tax";
 
+  let impactArea: string[] = [];
 
-let service="Indirect Tax";
+  let affectedAreas: string[] = [];
 
+  let riskLevel = "Medium";
 
-let impactArea:string[]=[];
+  if (
+    /gst|central tax|integrated tax|union territory tax/
+      .test(text)
+  ) {
+    service = "GST";
 
-let affectedAreas:string[]=[];
+    impactArea = [
+      "GST Compliance",
+      "GST Return Filing",
+      "Input Tax Credit Review",
+    ];
 
-let riskLevel="Medium";
+    affectedAreas = [
+      "GSTR-1",
+      "GSTR-3B",
+      "ITC Reconciliation",
+    ];
+  } else if (
+    /custom/
+      .test(text)
+  ) {
+    service = "Customs";
 
+    impactArea = [
+      "Import Export Compliance",
+      "Customs Duty Impact",
+    ];
 
+    affectedAreas = [
+      "Importers",
+      "Exporters",
+      "IEC Holders",
+    ];
+  } else if (
+    /excise/
+      .test(text)
+  ) {
+    service = "Central Excise";
 
-if(
-/gst|central tax|integrated tax|union territory tax/
-.test(text)
-){
+    impactArea = [
+      "Excise Duty Compliance",
+    ];
 
-service="GST";
+    affectedAreas = [
+      "Manufacturers",
+    ];
+  }
 
+  if (
+    /rate|duty|amend|tariff|exempt/
+      .test(text)
+  ) {
+    riskLevel = "High";
+  }
 
-impactArea=[
-"GST Compliance",
-"GST Return Filing",
-"Input Tax Credit Review"
-];
+  return {
+    service,
 
+    documentType: item.updateType ?? "Notification",
 
-affectedAreas=[
-"GSTR-1",
-"GSTR-3B",
-"ITC Reconciliation"
-];
+    category: item.updateCategory ?? "",
 
+    impactArea,
 
+    affectedAreas,
+
+    aiAction: [
+      "Identify affected taxpayers",
+
+      "Analyse compliance impact",
+
+      "Check applicability for clients",
+
+      "Prepare advisory note if required",
+    ],
+
+    riskLevel,
+  };
 }
-
-
-
-else if(
-/custom/
-.test(text)
-){
-
-service="Customs";
-
-
-impactArea=[
-"Import Export Compliance",
-"Customs Duty Impact"
-];
-
-
-affectedAreas=[
-"Importers",
-"Exporters",
-"IEC Holders"
-];
-
-
-}
-
-
-
-else if(
-/excise/
-.test(text)
-){
-
-service="Central Excise";
-
-
-impactArea=[
-"Excise Duty Compliance"
-];
-
-
-affectedAreas=[
-"Manufacturers"
-];
-
-
-}
-
-
-
-if(
-/rate|duty|amend|tariff|exempt/
-.test(text)
-){
-
-riskLevel="High";
-
-}
-
-
-
-return {
-
-
-service,
-
-documentType:
-item.updateType ?? "Notification",
-
-
-category:
-item.updateCategory ?? "",
-
-
-impactArea,
-
-
-affectedAreas,
-
-
-aiAction:[
-
-"Identify affected taxpayers",
-
-"Analyse compliance impact",
-
-"Check applicability for clients",
-
-"Prepare advisory note if required"
-
-],
-
-
-riskLevel
-
-
-};
-
-}
-
-
-
 
 export function parseCBICUpdates(
+  data: CBICItem[],
+  options: ParseOptions = {},
+): NewsItem[] {
+  const cutoff = options.maxAgeDays
+    ? Date.now() -
+      (options.maxAgeDays * 86400000)
+    : null;
 
-data:CBICItem[],
+  const result: NewsItem[] = [];
 
-options:ParseOptions={}
+  for (const item of data) {
+    const date = item.updatedDate ? new Date(item.updatedDate) : null;
 
-):NewsItem[]{
+    if (!date || isNaN(date.getTime())) {
+      continue;
+    }
 
+    if (
+      cutoff &&
+      date.getTime() < cutoff
+    ) {
+      continue;
+    }
 
+    const intelligence = analyseCBICImpact(item);
 
-const cutoff =
-options.maxAgeDays
-?
-Date.now() -
-(options.maxAgeDays * 86400000)
-:
-null;
+    const link = getDocumentLink(item);
 
+    result.push({
+      date,
 
+      title: `${intelligence.service} | ${intelligence.documentType} | ${
+        item.notificationNo ?? ""
+      } - ${item.notificationName ?? ""}`,
 
-const result:NewsItem[]=[];
-
-
-
-for(const item of data){
-
-
-
-const date =
-item.updatedDate
-?
-new Date(item.updatedDate)
-:
-null;
-
-
-
-if(!date || isNaN(date.getTime())){
-
-continue;
-
-}
-
-
-
-if(
-cutoff &&
-date.getTime()<cutoff
-){
-
-continue;
-
-}
-
-
-
-const intelligence =
-analyseCBICImpact(item);
-
-
-
-const link =
-getDocumentLink(item);
-
-
-
-result.push({
-
-
-
-date,
-
-
-title:
-
-`${intelligence.service} | ${intelligence.documentType} | ${
-item.notificationNo ?? ""
-} - ${
-item.notificationName ?? ""
-}`,
-
-
-
-html:`
+      html: `
 
 <h2>CBIC Regulatory Update</h2>
 
@@ -390,12 +265,12 @@ ${item.notificationName ?? ""}
 <ul>
 
 ${
-intelligence.impactArea
-.map(
-x=>`<li>${x}</li>`
-)
-.join("")
-}
+        intelligence.impactArea
+          .map(
+            (x) => `<li>${x}</li>`,
+          )
+          .join("")
+      }
 
 </ul>
 
@@ -406,12 +281,12 @@ x=>`<li>${x}</li>`
 <ul>
 
 ${
-intelligence.affectedAreas
-.map(
-x=>`<li>${x}</li>`
-)
-.join("")
-}
+        intelligence.affectedAreas
+          .map(
+            (x) => `<li>${x}</li>`,
+          )
+          .join("")
+      }
 
 </ul>
 
@@ -422,12 +297,12 @@ x=>`<li>${x}</li>`
 <ul>
 
 ${
-intelligence.aiAction
-.map(
-x=>`<li>${x}</li>`
-)
-.join("")
-}
+        intelligence.aiAction
+          .map(
+            (x) => `<li>${x}</li>`,
+          )
+          .join("")
+      }
 
 </ul>
 
@@ -445,31 +320,17 @@ Open Original CBIC Document
 
 `,
 
+      link,
 
-link,
+      id: `${BASE_URL}/notification/${item.id}`,
 
+      ...intelligence,
+    });
+  }
 
-id:
-`${BASE_URL}/notification/${item.id}`,
-
-
-
-...intelligence
-
-
-});
-
-
-}
-
-
-
-return result.sort(
-(a,b)=>
-b.date.getTime()
--
-a.date.getTime()
-);
-
-
+  return result.sort(
+    (a, b) =>
+      b.date.getTime() -
+      a.date.getTime(),
+  );
 }
