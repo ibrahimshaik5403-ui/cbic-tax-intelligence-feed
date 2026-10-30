@@ -1,22 +1,30 @@
-export function classifyCBICUpdate(item: any) {
+export interface CBICUpdate {
+  notificationName?: string;
+  updateCategory?: string;
+  updateType?: string;
+  notificationNo?: string;
+  updatedDate?: string;
+}
+
+export function classifyCBICUpdate(item: CBICUpdate) {
   let service = "Indirect Tax";
 
   let documentType = item.updateType || "Notification";
 
-  let category = item.updateCategory || "";
+  const category = item.updateCategory || "";
 
-  let impactArea: string[] = [];
+  const impactArea: string[] = [];
 
-  let aiAction: string[] = [];
+  const aiAction: string[] = [];
 
-  let affectedAreas: string[] = [];
+  const affectedAreas: string[] = [];
 
   let riskLevel = "Medium";
 
   const text = `
-${item.notificationName}
-${item.updateCategory}
-${item.updateType}
+${item.notificationName ?? ""}
+${item.updateCategory ?? ""}
+${item.updateType ?? ""}
 `
     .toLowerCase();
 
@@ -42,9 +50,7 @@ ${item.updateType}
       "GSTR-3B",
       "Electronic Credit Ledger",
     );
-  } else if (
-    text.includes("custom")
-  ) {
+  } else if (text.includes("custom")) {
     service = "Customs";
 
     impactArea.push(
@@ -57,9 +63,7 @@ ${item.updateType}
       "Exporters",
       "IEC Holders",
     );
-  } else if (
-    text.includes("excise")
-  ) {
+  } else if (text.includes("excise")) {
     service = "Central Excise";
 
     impactArea.push(
@@ -109,17 +113,11 @@ ${item.updateType}
 
   return {
     service,
-
     documentType,
-
     category,
-
     impactArea,
-
     aiAction,
-
     affectedAreas,
-
     riskLevel,
   };
 }

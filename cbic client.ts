@@ -24,12 +24,46 @@ export interface CBICUpdate {
   documentUrl: string;
 }
 
+interface CBICCategory {
+  taxId: number;
+
+  menuType: string;
+
+  service: string;
+}
+
+interface CBICMenuResponse {
+  menuInput?: string;
+
+  menuName?: string;
+
+  type?: string;
+}
+
+interface CBICApiItem {
+  id: number;
+
+  updatedDate: string;
+
+  notificationNo?: string;
+
+  notificationName?: string;
+
+  updateType?: string;
+
+  updateCategory?: string;
+
+  docFilePath?: string;
+}
+
 // ------------------------------------------------
 // Map Tax ID to Service Name
 // ------------------------------------------------
 
-function getServiceName(taxId: number) {
-  const map: any = {
+function getServiceName(
+  taxId: number,
+): string {
+  const map: Record<number, string> = {
     1000001: "GST",
 
     1000002: "Customs",
@@ -41,14 +75,14 @@ function getServiceName(taxId: number) {
     100005: "HSNS Cess",
   };
 
-  return map[taxId] || "CBIC";
+  return map[taxId] ?? "CBIC";
 }
 
 // ------------------------------------------------
 // Generate Home Token
 // ------------------------------------------------
 
-async function getHomeToken() {
+async function getHomeToken(): Promise<string> {
   const response = await fetch(
     `${BASE_URL}/api/authenticate-token`,
     {
@@ -72,7 +106,7 @@ async function getHomeToken() {
     );
   }
 
-  const data = await response.json();
+  const data: { id_token: string } = await response.json();
 
   console.log(
     "Token generated",
@@ -85,7 +119,7 @@ async function getHomeToken() {
 // Discover CBIC Categories
 // ------------------------------------------------
 
-async function getCBICMenus() {
+async function getCBICMenus(): Promise<CBICCategory[]> {
   const response = await fetch(
     `${BASE_URL}/api/cbicmenumsts`,
     {
@@ -103,38 +137,37 @@ async function getCBICMenus() {
     );
   }
 
-  const menus = await response.json();
+  const menus: CBICMenuResponse[] = await response.json();
 
-  const categories: any[] = [];
+  const categories: CBICCategory[] = [];
 
-  for (
-    const item of menus
-  ) {
+  for (const item of menus) {
     if (!item.menuInput) {
       continue;
     }
 
     try {
-      const input = JSON.parse(
-        item.menuInput,
-      );
+      const input: {
+        taxId?: number;
+        menuType?: string;
+      } = JSON.parse(item.menuInput);
 
       if (
         input.taxId &&
         input.menuType
       ) {
-        const taxId = Number(input.taxId);
-
         categories.push({
-          service: getServiceName(taxId),
-
-          taxId,
+          taxId: Number(input.taxId),
 
           menuType: input.menuType,
+
+          service: getServiceName(
+            Number(input.taxId),
+          ),
         });
       }
     } catch {
-      continue;
+      // Ignore invalid menu entries
     }
   }
 
@@ -148,7 +181,7 @@ async function getCBICMenus() {
 function createDocumentUrl(
   id: number,
   menuType: string,
-) {
+): string {
   return (
     `${BASE_URL}/view-pdf/${id}/ENG/${menuType}`
   );
@@ -190,27 +223,27 @@ async function fetchUpdatesByTaxId(
     return [];
   }
 
-  const data = await response.json();
+  const data: CBICApiItem[] = await response.json();
 
   return data.map(
-    (item: any) => (
-      {
-        ...item,
+    (item) => ({
+      ...item,
 
-        taxId,
+      taxId,
 
-        service,
+      service,
 
-        menuType,
+      menuType,
 
-        category: menuType,
-
-        documentUrl: createDocumentUrl(
+      documentUrl: item.docFilePath
+        ? item.docFilePath.startsWith("http")
+          ? item.docFilePath
+          : `${BASE_URL}${item.docFilePath}`
+        : createDocumentUrl(
           item.id,
           menuType,
         ),
-      }
-    ),
+    }),
   );
 }
 
@@ -232,7 +265,7 @@ export async function fetchCBICUpdates() {
     categories.length,
   );
 
-  let allUpdates: CBICUpdate[] = [];
+  const allUpdates: CBICUpdate[] = [];
 
   for (
     const category of categories
@@ -252,8 +285,6 @@ export async function fetchCBICUpdates() {
       ...updates,
     );
   }
-
-  // Remove duplicates
 
   const unique = Array.from(
     new Map(

@@ -51,7 +51,7 @@ export async function fetchCBICDocuments(
 
   const data = await response.json();
 
-  return data.map((item: any) => ({
+  return data.map((item: CBICUpdate) => ({
     ...item,
 
     menuType,

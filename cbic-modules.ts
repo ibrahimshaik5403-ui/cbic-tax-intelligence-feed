@@ -36,6 +36,7 @@ export async function getCBICDocumentMenus() {
           });
         }
       } catch {
+        // Ignore invalid CBIC menu records
       }
     }
   }

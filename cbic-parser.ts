@@ -1,34 +1,42 @@
 export interface NewsItem {
   date: Date;
-
   title: string;
-
   html: string;
-
   link: string;
-
   id: string;
 
-  // CA Intelligence Fields
-
   service: string;
-
   documentType: string;
-
   category: string;
 
   impactArea: string[];
-
   aiAction: string[];
-
   affectedAreas: string[];
 
   riskLevel: string;
 }
 
+interface CBICItem {
+  id: number;
+
+  updatedDate?: string;
+
+  notificationNo?: string;
+
+  notificationName?: string;
+
+  updateType?: string;
+
+  updateCategory?: string;
+
+  service?: string;
+
+  docFilePath?: string;
+}
+
 const BASE_URL = "https://taxinformation.cbic.gov.in";
 
-function getDocumentFolder(type: string) {
+function getDocumentFolder(type?: string) {
   switch (type?.toLowerCase()) {
     case "notification":
       return "Notifications";
@@ -59,25 +67,49 @@ function getDocumentFolder(type: string) {
   }
 }
 
-function analyseCBICImpact(item: any) {
+function getDocumentLink(item: CBICItem): string {
+  // Preferred CBIC API document path
+
+  if (
+    item.docFilePath &&
+    item.docFilePath.startsWith("http")
+  ) {
+    return item.docFilePath;
+  }
+
+  // If API gives relative path
+
+  if (item.docFilePath) {
+    return `${BASE_URL}${item.docFilePath}`;
+  }
+
+  // Fallback generated PDF URL
+
+  const folder = getDocumentFolder(item.updateType);
+
+  return `${BASE_URL}/view-pdf/${item.id}/ENG/${folder}`;
+}
+
+function analyseCBICImpact(item: CBICItem) {
   const text = `
-  ${item.service}
-  ${item.updateType}
-  ${item.notificationName}
-  ${item.updateCategory}
-  `.toLowerCase();
+${item.service ?? ""}
+${item.updateType ?? ""}
+${item.notificationName ?? ""}
+${item.updateCategory ?? ""}
+`
+    .toLowerCase();
 
-  let service = item.service || "Indirect Tax";
+  let service = item.service ?? "Indirect Tax";
 
-  let impactArea: string[] = [];
+  const impactArea: string[] = [];
 
-  let aiAction: string[] = [];
+  const aiAction: string[] = [];
 
-  let affectedAreas: string[] = [];
+  const affectedAreas: string[] = [];
 
   let riskLevel = "Medium";
 
-  // GST Classification
+  // GST
 
   if (
     text.includes("gst") ||
@@ -98,7 +130,7 @@ function analyseCBICImpact(item: any) {
       "GSTR-3B",
       "ITC Reconciliation",
     );
-  } // Customs Classification
+  } // Customs
 
   else if (
     text.includes("custom")
@@ -115,7 +147,7 @@ function analyseCBICImpact(item: any) {
       "Exporters",
       "IEC Holders",
     );
-  } // Central Excise Classification
+  } // Excise
 
   else if (
     text.includes("excise")
@@ -131,7 +163,7 @@ function analyseCBICImpact(item: any) {
     );
   }
 
-  // Risk Analysis
+  // Risk
 
   if (
     text.includes("rate") ||
@@ -141,8 +173,6 @@ function analyseCBICImpact(item: any) {
   ) {
     riskLevel = "High";
   }
-
-  // AI Recommended Actions
 
   aiAction.push(
     "Identify affected taxpayers",
@@ -154,7 +184,7 @@ function analyseCBICImpact(item: any) {
   return {
     service,
 
-    documentType: item.updateType || "Notification",
+    documentType: item.updateType ?? "Notification",
 
     category: item.updateCategory ?? "",
 
@@ -169,20 +199,22 @@ function analyseCBICImpact(item: any) {
 }
 
 export function parseCBICUpdates(
-  data: any[],
+  data: CBICItem[],
 ): NewsItem[] {
-  return data.map((item: any) => {
-    const folder = getDocumentFolder(item.updateType);
-
-    const pdfLink = `${BASE_URL}/view-pdf/${item.id}/ENG/${folder}`;
+  return data.map((item) => {
+    const documentLink = getDocumentLink(item);
 
     const intelligence = analyseCBICImpact(item);
 
     return {
-      date: new Date(item.updatedDate),
+      date: new Date(
+        item.updatedDate ??
+          new Date().toISOString(),
+      ),
 
-      title:
-        `${intelligence.service} | ${intelligence.documentType} | ${item.notificationNo} - ${item.notificationName}`,
+      title: `${intelligence.service} | ${intelligence.documentType} | ${
+        item.notificationNo ?? ""
+      } - ${item.notificationName ?? ""}`,
 
       html: `
 
@@ -191,12 +223,10 @@ CBIC Regulatory Update
 </h2>
 
 
-
 <p>
 <b>Service:</b>
 ${intelligence.service}
 </p>
-
 
 
 <p>
@@ -205,12 +235,10 @@ ${intelligence.documentType}
 </p>
 
 
-
 <p>
 <b>Notification Number:</b>
-${item.notificationNo}
+${item.notificationNo ?? ""}
 </p>
-
 
 
 <p>
@@ -219,20 +247,21 @@ ${intelligence.category}
 </p>
 
 
-
 <p>
 <b>Date:</b>
-${new Date(item.updatedDate).toDateString()}
+${
+        new Date(
+          item.updatedDate ??
+            new Date(),
+        ).toDateString()
+      }
 </p>
-
 
 
 <p>
 <b>Risk Level:</b>
 ${intelligence.riskLevel}
 </p>
-
-
 
 
 <hr>
@@ -244,10 +273,8 @@ Description
 
 
 <p>
-${item.notificationName}
+${item.notificationName ?? ""}
 </p>
-
-
 
 
 <hr>
@@ -263,13 +290,12 @@ Tax Impact Analysis
 ${
         intelligence.impactArea
           .map(
-            (x: string) => `<li>${x}</li>`,
+            (x) => `<li>${x}</li>`,
           )
           .join("")
       }
 
 </ul>
-
 
 
 
@@ -283,17 +309,12 @@ Affected Areas
 ${
         intelligence.affectedAreas
           .map(
-            (x: string) => `<li>${x}</li>`,
+            (x) => `<li>${x}</li>`,
           )
           .join("")
       }
 
 </ul>
-
-
-
-
-<hr>
 
 
 
@@ -307,7 +328,7 @@ CA Intelligence Recommended Actions
 ${
         intelligence.aiAction
           .map(
-            (x: string) => `<li>${x}</li>`,
+            (x) => `<li>${x}</li>`,
           )
           .join("")
       }
@@ -316,19 +337,20 @@ ${
 
 
 
-
 <p>
 
-<a href="${pdfLink}">
+<a href="${documentLink}"
+target="_blank">
+
 Open Original CBIC Document
+
 </a>
 
 </p>
 
-
 `,
 
-      link: pdfLink,
+      link: documentLink,
 
       id: `${BASE_URL}/notification/${item.id}`,
 
