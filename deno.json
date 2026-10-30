@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "dev": "deno run --watch --allow-net --allow-write main.ts",
+    "build": "deno compile --allow-net --allow-write main.ts",
+    "run": "deno run --unsafely-ignore-certificate-errors --allow-net --allow-write main.ts"
+  },
+  "imports": {
+    "@feed/feed": "jsr:@feed/feed@^1.1.0",
+    "@b-fuze/deno-dom": "jsr:@b-fuze/deno-dom@^0.1.48",
+    "fast-xml-parser": "npm:fast-xml-parser@^5.11.2"
+  }
+}
