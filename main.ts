@@ -3,212 +3,122 @@
 
 import { Atom } from "@feed/feed";
 import { fetchCBICUpdates } from "./cbic client.ts";
-import { parseCBICUpdates, type NewsItem } from "./cbic-parser.ts";
+import { type NewsItem, parseCBICUpdates } from "./cbic-parser.ts";
 
-
-const NEWS_URL =
-  "https://taxinformation.cbic.gov.in/";
+const NEWS_URL = "https://taxinformation.cbic.gov.in/";
 
 let fileName = "feed.xml";
 
-
 const atomFeed = new Atom({
+  title: "CBIC Tax Information Portal Updates",
 
-  title:
-    "CBIC Tax Information Portal Updates",
+  description: "Latest GST, Customs, Central Excise and CBIC notifications",
 
-  description:
-    "Latest GST, Customs, Central Excise and CBIC notifications",
+  link: NEWS_URL,
 
-  link:
-    NEWS_URL,
-
-  authors:[
+  authors: [
     {
-      name:
-        "Central Board of Indirect Taxes and Customs",
-      email:
-        "cbic@example.org",
+      name: "Central Board of Indirect Taxes and Customs",
+      email: "cbic@example.org",
     },
   ],
 
-  updated:
-    new Date(),
+  updated: new Date(),
 
-  id:
-    NEWS_URL,
-
+  id: NEWS_URL,
 });
 
-
-
 async function fetchCBICNews(): Promise<NewsItem[]> {
-
   console.info(
-    "Fetching news from CBIC portal"
+    "Fetching news from CBIC portal",
   );
 
-
   try {
+    const data = await fetchCBICUpdates();
 
-    const data =
-      await fetchCBICUpdates();
-
-
-    const items =
-      parseCBICUpdates(data);
-
+    const items = parseCBICUpdates(data);
 
     return items;
-
-
-  } catch(error) {
-
+  } catch (error) {
     console.error(
       "CBIC fetch failed:",
-      error
+      error,
     );
 
     return [];
-
   }
-
 }
 
+async function fetchPayload() {
+  const items = await fetchCBICNews();
 
-
-async function fetchPayload(){
-
-
-  const items =
-    await fetchCBICNews();
-
-
-
-  if(items.length === 0){
-
+  if (items.length === 0) {
     console.error(
-      "No CBIC updates found"
+      "No CBIC updates found",
     );
 
     Deno.exit(1);
-
   }
 
-
-
   console.info(
-    `Generating feed (${items.length} items)...`
+    `Generating feed (${items.length} items)...`,
   );
 
+  const seen = new Set<string>();
 
-
-  const seen =
-    new Set<string>();
-
-
-  for(const item of items){
-
-
-    if(seen.has(item.id))
+  for (const item of items) {
+    if (seen.has(item.id)) {
       continue;
-
+    }
 
     seen.add(item.id);
 
-
-
     atomFeed.addItem({
+      title: item.title,
 
-      title:
-        item.title,
+      link: item.link,
 
+      id: item.id,
 
-      link:
-        item.link,
+      updated: item.date,
 
+      summary: item.title,
 
-      id:
-        item.id,
+      content: {
+        body: item.html,
 
-
-      updated:
-        item.date,
-
-
-      summary:
-        item.title,
-
-
-      content:{
-
-        body:
-          item.html,
-
-        type:
-          "html",
-
+        type: "html",
       },
-
     });
-
   }
-
-
 
   try {
-
-
     Deno.writeTextFileSync(
-
       fileName,
-
-      atomFeed.build()
-
+      atomFeed.build(),
     );
-
 
     console.log(
-      `Saved to ${fileName}`
+      `Saved to ${fileName}`,
     );
-
-
-  } catch(error){
-
-
+  } catch (error) {
     console.error(
       `Failed saving ${fileName}`,
-      error
+      error,
     );
 
-
     Deno.exit(1);
-
   }
-
 }
 
+function main() {
+  const args = Deno.args;
 
-
-function main(){
-
-
-  const args =
-    Deno.args;
-
-
-  if(args.length === 1){
-
-    fileName =
-      args[0];
-
+  if (args.length === 1) {
+    fileName = args[0];
   }
-
 
   fetchPayload();
-
 }
-
-
 
 main();

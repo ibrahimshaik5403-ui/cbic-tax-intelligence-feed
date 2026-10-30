@@ -1,85 +1,44 @@
 export interface CBICDocumentMenu {
+  name: string;
 
-    name:string;
+  taxId: number;
 
-    taxId:number;
-
-    menuType:string;
-
+  menuType: string;
 }
 
+export async function getCBICDocumentMenus() {
+  const response = await fetch(
+    "https://taxinformation.cbic.gov.in/api/cbicmenumsts",
+  );
 
+  const menus = await response.json();
 
-export async function getCBICDocumentMenus(){
+  const documents: CBICDocumentMenu[] = [];
 
-const response =
-await fetch(
-"https://taxinformation.cbic.gov.in/api/cbicmenumsts"
-);
+  for (const item of menus) {
+    if (
+      item.menuInput &&
+      item.type === "INFO"
+    ) {
+      try {
+        const input = JSON.parse(item.menuInput);
 
+        if (
+          input.taxId &&
+          input.menuType
+        ) {
+          documents.push({
+            name: item.menuName,
 
-const menus =
-await response.json();
+            taxId: input.taxId,
 
+            menuType: input.menuType,
+          });
+        }
+      } catch {
+      }
+    }
+  }
 
-
-const documents:CBICDocumentMenu[]=[];
-
-
-
-for(const item of menus){
-
-
-if(
-item.menuInput &&
-item.type==="INFO"
-){
-
-
-try{
-
-
-const input =
-JSON.parse(item.menuInput);
-
-
-
-if(
-input.taxId &&
-input.menuType
-){
-
-
-documents.push({
-
-name:item.menuName,
-
-taxId:input.taxId,
-
-menuType:input.menuType
-
-
-});
-
-
-}
-
-
-
-}
-catch{
-
-}
-
-
-}
-
-
-}
-
-
-
-return documents;
-
-
+  return documents;
 }
