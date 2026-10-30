@@ -5,8 +5,8 @@ A simple tool which converts the Latest News from the Indian
 into an RSS (atom) feed which can then be used in various integrations (like
 feed readers, bots)
 
-Feed URL (refreshed every 12 hours):
-`https://<your-github-username>.github.io/itrfeed/feed.xml`
+Feed URL (refreshed every 6 hours):
+https://ibrahimshaik5403-ui.github.io/cbic-tax-intelligence-feed/feed.xml
 
 # How it works
 
